@@ -66,6 +66,7 @@ const demoPassword = 'Plus12345'
 const MAX_ATTEMPTS = 5
 const LOCK_MINUTES = 15
 const STORAGE_KEY = 'pp_auth_guard'
+const USERS_KEY = 'pp_users'
 
 const email = ref('')
 const password = ref('')
@@ -134,7 +135,21 @@ const handleSubmit = async () => {
   const stored = localStorage.getItem(STORAGE_KEY)
   const parsed = stored ? JSON.parse(stored) : { attempts: 0, lockUntil: 0 }
 
-  if (email.value === demoEmail && password.value === demoPassword) {
+  const storedUsers = localStorage.getItem(USERS_KEY)
+  const users = storedUsers ? JSON.parse(storedUsers) : []
+  const matchedUser = users.find(
+    (user) => user.email === email.value && user.password === password.value
+  )
+
+  const isDemoMatch = email.value === demoEmail && password.value === demoPassword
+
+  if (matchedUser?.blocked) {
+    errorMessage.value = 'Пользователь заблокирован администратором'
+    isLoading.value = false
+    return
+  }
+
+  if (isDemoMatch || matchedUser) {
     errorMessage.value = ''
     resetGuardState()
     localStorage.setItem('pp_token', 'demo-jwt-token')
