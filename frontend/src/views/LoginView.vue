@@ -46,6 +46,9 @@
         </button>
 
         <p v-if="successMessage" class="success">{{ successMessage }}</p>
+        <p v-else-if="isBlocked" class="helper">
+          Попробуйте через {{ remainingLabel }}
+        </p>
         <p v-else class="helper">
           Тестовый вход: <strong>{{ demoEmail }}</strong> / <strong>{{ demoPassword }}</strong>
         </p>
@@ -55,11 +58,14 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import AuthIllustration from '../components/AuthIllustration.vue'
 
 const demoEmail = 'admin@plusportal.ru'
 const demoPassword = 'Plus12345'
+const MAX_ATTEMPTS = 5
+const LOCK_MINUTES = 15
+const STORAGE_KEY = 'pp_auth_guard'
 
 const email = ref('')
 const password = ref('')
@@ -67,11 +73,11 @@ const errorMessage = ref('')
 const successMessage = ref('')
 const isBlocked = ref(false)
 const isLoading = ref(false)
+const lockUntil = ref(0)
+const now = ref(Date.now())
+let tickId
 
 const clearError = () => {
-  if (isBlocked.value) {
-    isBlocked.value = false
-  }
   if (errorMessage.value) {
     errorMessage.value = ''
   }
@@ -80,20 +86,90 @@ const clearError = () => {
   }
 }
 
+const loadGuardState = () => {
+  const stored = localStorage.getItem(STORAGE_KEY)
+  if (!stored) {
+    lockUntil.value = 0
+    isBlocked.value = false
+    return
+  }
+
+  const parsed = JSON.parse(stored)
+  const storedLockUntil = parsed?.lockUntil ?? 0
+  if (storedLockUntil > Date.now()) {
+    lockUntil.value = storedLockUntil
+    isBlocked.value = true
+    errorMessage.value = 'Слишком много попыток. Вход временно заблокирован.'
+  } else {
+    lockUntil.value = 0
+    isBlocked.value = false
+  }
+}
+
+const saveGuardState = (attempts, until) => {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ attempts, lockUntil: until }))
+}
+
+const resetGuardState = () => {
+  localStorage.removeItem(STORAGE_KEY)
+  lockUntil.value = 0
+  isBlocked.value = false
+}
+
+const remainingLabel = computed(() => {
+  const diff = Math.max(lockUntil.value - now.value, 0)
+  const minutes = Math.floor(diff / 60000)
+  const seconds = Math.floor((diff % 60000) / 1000)
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+})
+
 const handleSubmit = async () => {
+  if (isBlocked.value) {
+    return
+  }
+
   isLoading.value = true
   successMessage.value = ''
 
+  const stored = localStorage.getItem(STORAGE_KEY)
+  const parsed = stored ? JSON.parse(stored) : { attempts: 0, lockUntil: 0 }
+
   if (email.value === demoEmail && password.value === demoPassword) {
     errorMessage.value = ''
-    isBlocked.value = false
+    resetGuardState()
     localStorage.setItem('pp_token', 'demo-jwt-token')
     successMessage.value = 'Успешный вход. Токен сохранен локально.'
   } else {
-    errorMessage.value = 'Неправильный пароль'
-    isBlocked.value = true
+    const nextAttempts = (parsed.attempts ?? 0) + 1
+    if (nextAttempts >= MAX_ATTEMPTS) {
+      const until = Date.now() + LOCK_MINUTES * 60 * 1000
+      lockUntil.value = until
+      isBlocked.value = true
+      errorMessage.value = 'Слишком много попыток. Вход временно заблокирован.'
+      saveGuardState(nextAttempts, until)
+    } else {
+      errorMessage.value = 'Неправильный пароль'
+      saveGuardState(nextAttempts, 0)
+    }
   }
 
   isLoading.value = false
 }
+
+onMounted(() => {
+  loadGuardState()
+  tickId = setInterval(() => {
+    now.value = Date.now()
+    if (isBlocked.value && lockUntil.value && lockUntil.value <= now.value) {
+      resetGuardState()
+      errorMessage.value = ''
+    }
+  }, 1000)
+})
+
+onBeforeUnmount(() => {
+  if (tickId) {
+    clearInterval(tickId)
+  }
+})
 </script>
