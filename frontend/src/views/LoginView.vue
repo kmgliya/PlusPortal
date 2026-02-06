@@ -1,31 +1,33 @@
 <template>
-  <section class="auth-card">
-    <div class="auth-visual">
-      <AuthIllustration />
-    </div>
-    <div class="auth-content">
-      <h1>
-        Ну что, продолжим
-        <br />
-        этот <span class="accent">классный</span> день?
-      </h1>
-      <p class="auth-subtitle">
-        Авторизуйся, чтобы продолжить онбординг, вести свои задачи и сохранять
-        весь прогресс в одном месте.
-      </p>
+  <div class="auth-page">
+    <section class="auth-card">
+      <div class="auth-visual">
+        <AuthIllustration />
+      </div>
+      <div class="auth-content">
+        <span class="auth-eyebrow">Добро пожаловать в PlusPortal</span>
+        <h1>
+          Ну что, продолжим
+          <br />
+          этот <span class="accent">классный</span> день?
+        </h1>
+        <p class="auth-subtitle">
+          Авторизуйся, чтобы продолжить онбординг, вести свои задачи и сохранять
+          весь прогресс в одном месте.
+        </p>
 
-      <form class="auth-form" @submit.prevent="handleSubmit">
-        <label class="field">
-          <span class="field-label">Почта</span>
-          <input
-            v-model.trim="email"
-            type="email"
-            placeholder="Почта"
-            autocomplete="email"
-            @input="clearError"
-            required
-          />
-        </label>
+        <form class="auth-form" @submit.prevent="handleSubmit">
+          <label class="field">
+            <span class="field-label">Почта</span>
+            <input
+              v-model.trim="email"
+              type="email"
+              placeholder="Почта"
+              autocomplete="email"
+              @input="clearError"
+              required
+            />
+          </label>
 
         <label class="field">
           <span class="field-label">Пароль</span>
@@ -41,32 +43,37 @@
           <span v-if="errorMessage" class="field-error">{{ errorMessage }}</span>
         </label>
 
-        <button class="primary-button" :disabled="isBlocked || isLoading">
-          {{ isBlocked ? 'Вход заблокирован' : 'Войти' }}
-        </button>
+          <button class="primary-button" :disabled="isBlocked || isLoading">
+            {{ isBlocked ? 'Вход заблокирован' : 'Войти' }}
+          </button>
 
-        <p v-if="successMessage" class="success">{{ successMessage }}</p>
-        <p v-else-if="isBlocked" class="helper">
-          Попробуйте через {{ remainingLabel }}
-        </p>
-        <p v-else class="helper">
-          Тестовый вход: <strong>{{ demoEmail }}</strong> / <strong>{{ demoPassword }}</strong>
-        </p>
-      </form>
-    </div>
-  </section>
+          <p v-if="successMessage" class="success">{{ successMessage }}</p>
+          <p v-else-if="isBlocked" class="helper">
+            Попробуйте через {{ remainingLabel }}
+          </p>
+          <p v-else class="helper">
+            Админ вход: <strong>{{ adminEmail }}</strong> / <strong>{{ adminPassword }}</strong>
+          </p>
+        </form>
+      </div>
+    </section>
+  </div>
 </template>
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import AuthIllustration from '../components/AuthIllustration.vue'
 
-const demoEmail = 'admin@plusportal.ru'
-const demoPassword = 'Plus12345'
+const adminEmail = 'nikolay@gmail.com'
+const adminPassword = '123456789'
 const MAX_ATTEMPTS = 5
 const LOCK_MINUTES = 15
 const STORAGE_KEY = 'pp_auth_guard'
 const USERS_KEY = 'pp_users'
+const CURRENT_USER_KEY = 'pp_current_user'
+
+const router = useRouter()
 
 const email = ref('')
 const password = ref('')
@@ -141,7 +148,7 @@ const handleSubmit = async () => {
     (user) => user.email === email.value && user.password === password.value
   )
 
-  const isDemoMatch = email.value === demoEmail && password.value === demoPassword
+  const isAdminMatch = email.value === adminEmail && password.value === adminPassword
 
   if (matchedUser?.blocked) {
     errorMessage.value = 'Пользователь заблокирован администратором'
@@ -149,11 +156,30 @@ const handleSubmit = async () => {
     return
   }
 
-  if (isDemoMatch || matchedUser) {
+  if (isAdminMatch || matchedUser) {
     errorMessage.value = ''
     resetGuardState()
     localStorage.setItem('pp_token', 'demo-jwt-token')
+    const userPayload = isAdminMatch
+      ? {
+          fullName: 'Администратор',
+          email: adminEmail,
+          department: 'Администрация',
+          position: 'Администратор',
+          role: 'admin',
+        }
+      : {
+          fullName: matchedUser.fullName,
+          email: matchedUser.email,
+          department: matchedUser.department,
+          position: matchedUser.position,
+          role: 'employee',
+        }
+    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(userPayload))
     successMessage.value = 'Успешный вход. Токен сохранен локально.'
+    setTimeout(() => {
+      router.push(isAdminMatch ? '/admin/home' : '/home')
+    }, 300)
   } else {
     const nextAttempts = (parsed.attempts ?? 0) + 1
     if (nextAttempts >= MAX_ATTEMPTS) {
