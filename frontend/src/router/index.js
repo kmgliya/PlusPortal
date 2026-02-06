@@ -6,6 +6,7 @@ import LoginView from '../views/LoginView.vue'
 import AdminHomeView from '../views/AdminHomeView.vue'
 import HomeView from '../views/HomeView.vue'
 import CoursesView from '../views/CoursesView.vue'
+import CoursePlayerView from '../views/CoursePlayerView.vue'
 import ReportsView from '../views/ReportsView.vue'
 import RegulationsView from '../views/RegulationsView.vue'
 import ScheduleView from '../views/ScheduleView.vue'
@@ -19,6 +20,7 @@ const routes = [
     children: [
       { path: 'home', name: 'home', component: HomeView },
       { path: 'courses', name: 'courses', component: CoursesView },
+      { path: 'courses/:id', name: 'course-player', component: CoursePlayerView },
       { path: 'reports', name: 'reports', component: ReportsView },
       { path: 'regulations', name: 'regulations', component: RegulationsView },
       { path: 'schedule', name: 'schedule', component: ScheduleView },
@@ -30,6 +32,7 @@ const routes = [
     children: [
       { path: 'home', name: 'admin-home', component: AdminHomeView },
       { path: 'courses', name: 'admin-courses', component: CoursesView },
+      { path: 'courses/:id', name: 'admin-course-player', component: CoursePlayerView },
       { path: 'reports', name: 'admin-reports', component: ReportsView },
       { path: 'regulations', name: 'admin-regulations', component: RegulationsView },
       { path: 'schedule', name: 'admin-schedule', component: ScheduleView },
